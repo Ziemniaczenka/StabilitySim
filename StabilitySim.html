@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="eng">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stability Simulator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg: #f3f4f6;
+            --surface: #ffffff;
+            --text: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --success-bg: #dcfce7;
+            --success-text: #166534;
+            --danger-bg: #fee2e2;
+            --danger-text: #991b1b;
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success-bg: #022c22;
+            --success-text: #6ee7b7;
+            --danger-bg: #450a0a;
+            --danger-text: #fca5a5;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            margin: 0;
+            color: var(--text);
+            font-size: 2.2rem;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+        .panel h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            border-bottom: 2px solid var(--bg);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            color: var(--text);
+        }
+        .control-group { margin-bottom: 20px; }
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .k-inputs {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+        .list-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .list-item input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .list-item input:focus { border-color: var(--primary); }
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: var(--primary-hover); }
+        .btn-icon {
+            background: #ef4444;
+            padding: 8px 12px;
+        }
+        .btn-icon:hover { background: #dc2626; }
+        .btn-add {
+            width: 100%;
+            background: #f8fafc;
+            color: var(--text);
+            border: 1px dashed #9ca3af;
+            padding: 10px;
+        }
+        .btn-add:hover { background: #e5e7eb; }
+        
+        .schematic {
+            font-family: 'Courier New', Courier, monospace;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border);
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 1.3;
+            white-space: pre;
+            overflow-x: auto;
+            color: #334155;
+        }
+        [data-theme="dark"] .schematic { background: var(--bg); color: var(--text-muted); }
+
+        .math-box {
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        [data-theme="dark"] .math-box { background: #020617; }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .metric-card {
+            background: #f0f9ff;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #bae6fd;
+            text-align: center;
+        }
+        [data-theme="dark"] .metric-card { background: var(--bg); border-color: var(--border); }
+        
+        .metric-card.neutral {
+            background: var(--bg);
+            border-color: var(--border);
+        }
+        .metric-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #0369a1;
+        }
+        [data-theme="dark"] .metric-value { color: #38bdf8; }
+        .metric-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .status {
+            text-align: center;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .status.stable { background: var(--success-bg); color: var(--success-text); border: 1px solid #bbf7d0; }
+        .status.unstable { background: var(--danger-bg); color: var(--danger-text); border: 1px solid #fecaca; }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+            min-width: 0;
+        }
+        .chart-wrapper {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 4px -1px rgba(0,0,0,0.03);
+            min-height: 350px;
+            position: relative;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .chart-wrapper.square { aspect-ratio: 1 / 1; max-height: 600px; margin: 0 auto; width: 100%; }
+        
+        .right-panel { min-width: 0; }
+        [data-theme="dark"] input[type="number"], [data-theme="dark"] select { background: var(--surface); color: var(--text); border-color: var(--border); }
+        [data-theme="dark"] .btn-add { background: var(--surface); border-color: var(--text-muted); color: var(--text); }
+        [data-theme="dark"] .btn-add:hover { background: var(--bg); }
+        canvas { max-width: 100%; }
+        
+        @media (max-width: 1024px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body data-theme="light">
+
+<div class="header">
+    <h1>Stability Simulator of Closed Loop Amplifier</h1>
+    <button id="theme-toggle" class="btn" style="position: absolute; right: 20px; top: 20px;" onclick="toggleTheme()">🌙 Tryb Ciemny</button>
+</div>
+
+<div class="layout">
+    <div class="left-panel">
+        <div class="panel">
+            <h2>Schematic (Closed Loop)</h2>
+            <div class="schematic">
+U(s) ───►(+)───[ Aol(s) ]───┬───► Y(s)
+ ▲                │
+ └───[  Beta  ]◄──┘
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Parameters</h2>
+            
+            <div class="control-group">
+                <div class="control-header">
+                    <span>Gain (K):</span>
+                </div>
+                <div class="k-inputs">
+                    <input type="text" id="k-num" value="1.00 k" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border);">
+                    <input type="range" id="k-slider" min="-1" max="6" step="0.01" value="3">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">Units:</div>
+                <div style="display: flex; gap: 10px;">
+                    <select id="unit-freq" onchange="update()" style="flex: 1; padding: 6px; border-radius: 6px;">
+                        <option value="hz" selected>Frequency: Hz</option>
+                        <option value="rads">Pulsation: rad/s</option>
+                    </select>
+                    <select id="unit-mag" onchange="update()" style="flex: 1; padding: 6px; border-radius: 6px;">
+                        <option value="db">Amplitude: dB</option>
+                        <option value="vv">Amplitude: V/V</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="control-header">Poles and Zeros Unit:</div>
+                <select id="unit-zp" onchange="update()" style="width: 100%; padding: 6px; border-radius: 6px;">
+                    <option value="hz" selected>Frequency [Hz]</option>
+                    <option value="rads">Pulsation [rad/s]</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">Visibility of graphs:</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; margin-top: 10px;">
+                    <label><input type="checkbox" id="show-bode-mag" checked onchange="toggleCharts()"> Bode Amplitude</label>
+                    <label><input type="checkbox" id="show-bode-phase" checked onchange="toggleCharts()"> Bode Phase</label>
+                    <label><input type="checkbox" id="show-nyquist" checked onchange="toggleCharts()"> Nyquist</label>
+                    <label><input type="checkbox" id="show-acl" checked onchange="toggleCharts()"> Amplitude Acl</label>
+                    <label><input type="checkbox" id="show-pz" onchange="toggleCharts()"> Z/P Map</label>
+                    <label><input type="checkbox" id="show-step" checked onchange="toggleCharts()"> Impulse response</label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <span>Feedback (Beta):</span>
+                </div>
+                <div class="k-inputs">
+                    <input type="number" id="beta-num" value="1.00" step="0.01" min="0" max="1" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border);">
+                    <input type="range" id="beta-slider" min="0" max="1" step="0.01" value="1">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="control-header">
+                    <span>Nyquist range (Max):</span>
+                    <label style="font-weight: normal; cursor: pointer;">
+                        <input type="checkbox" id="nyquist-auto" checked> Auto
+                    </label>
+                </div>
+                <div class="k-inputs">
+                    <input type="number" id="nyquist-val" value="2.0" step="0.1" min="0.1" disabled style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border);">
+                    <input type="range" id="nyquist-slider" min="-1" max="5" step="0.01" value="0.30" disabled>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">Zeros (1 &plusmn; s/&omega;z):</div>
+                <div id="zeros-list"></div>
+                <button class="btn btn-add" onclick="addItem('zeros')">+ Add Zero</button>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">Poles (1 + s/&omega;p):</div>
+                <div id="poles-list"></div>
+                <button class="btn btn-add" onclick="addItem('poles')">+ Add Pole</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Analisys</h2>
+            <div class="math-box" id="math-display"></div>
+            
+            <div id="stability-status" class="status stable">Stability Status</div>
+
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-value" id="pm">--&deg;</div>
+                    <div class="metric-label">Phase Margin (PM)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="gm">-- dB</div>
+                    <div class="metric-label">Gain Margin (GM)</div>
+                </div>
+                <div class="metric-card neutral">
+                    <div class="metric-value" id="px">-- rad/s</div>
+                    <div class="metric-label">Phase Crossover (PX)</div>
+                </div>
+                <div class="metric-card neutral">
+                    <div class="metric-value" id="gx">-- rad/s</div>
+                    <div class="metric-label">Gain Crossover (GX)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="charts-grid">
+            <div class="chart-wrapper" id="wrap-bode-mag"><canvas id="bodeMagChart"></canvas></div>
+            <div class="chart-wrapper" id="wrap-bode-phase"><canvas id="bodePhaseChart"></canvas></div>
+            <div class="chart-wrapper" id="wrap-acl"><canvas id="aclMagChart"></canvas></div>
+            <div class="chart-wrapper square" id="wrap-nyquist"><canvas id="nyquistChart"></canvas></div>
+            <div class="chart-wrapper square" id="wrap-pz"><canvas id="pzChart"></canvas></div>
+            <div class="chart-wrapper" id="wrap-step"><canvas id="stepChart"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let k_gain = 1000.0;
+    let beta = 1.0;
+    let zeros = [-1000];
+    let poles = [-10, -100, -10000, -1000000];
+    let globalMargins = { Wcg: null, Wcp: null, PM: Infinity, GM: Infinity, MagAtWcp: null, PhaseAtWcg: null };
+    let charts = {};
+
+    Chart.defaults.animation = false;
+
+    function parsePrefix(val) {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        let str = val.toString().trim().replace(',', '.');
+        let mult = 1;
+        if (str.match(/k$/i)) { mult = 1e3; str = str.slice(0, -1); }
+        else if (str.match(/M$/)) { mult = 1e6; str = str.slice(0, -1); }
+        else if (str.match(/G$/i)) { mult = 1e9; str = str.slice(0, -1); }
+        else if (str.match(/m$/)) { mult = 1e-3; str = str.slice(0, -1); }
+        else if (str.match(/u|µ$/i)) { mult = 1e-6; str = str.slice(0, -1); }
+        else if (str.match(/n$/i)) { mult = 1e-9; str = str.slice(0, -1); }
+        let parsed = parseFloat(str);
+        return isNaN(parsed) ? 0 : parsed * mult;
+    }
+
+    function formatPrefix(val) {
+        if (val === 0 || Math.abs(val) < 1e-12) return "0";
+        let absVal = Math.abs(val);
+        if (absVal >= 1e9) return (val / 1e9).toFixed(2).replace(/\.00$/, '') + ' G';
+        if (absVal >= 1e6) return (val / 1e6).toFixed(2).replace(/\.00$/, '') + ' M';
+        if (absVal >= 1e3) return (val / 1e3).toFixed(2).replace(/\.00$/, '') + ' k';
+        if (absVal >= 1) return val.toFixed(2).replace(/\.00$/, '');
+        if (absVal >= 1e-3) return (val * 1e3).toFixed(2).replace(/\.00$/, '') + ' m';
+        if (absVal >= 1e-6) return (val * 1e6).toFixed(2).replace(/\.00$/, '') + ' µ';
+        if (absVal >= 1e-9) return (val * 1e9).toFixed(2).replace(/\.00$/, '') + ' n';
+        return val.toExponential(2);
+    }
+
+    function toggleTheme() {
+        let isDark = document.body.getAttribute('data-theme') === 'dark';
+        document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+        document.getElementById('theme-toggle').innerText = isDark ? '🌙 Dark Mode' : '☀️ Light Mode';
+        update();
+    }
+
+    function init() {
+        kNum.value = formatPrefix(k_gain);
+        sortZP();
+        renderList('zeros');
+        renderList('poles');
+        toggleCharts();
+        update();
+    }
+
+    function toggleCharts() {
+        document.getElementById('wrap-bode-mag').style.display = document.getElementById('show-bode-mag').checked ? 'block' : 'none';
+        document.getElementById('wrap-bode-phase').style.display = document.getElementById('show-bode-phase').checked ? 'block' : 'none';
+        document.getElementById('wrap-acl').style.display = document.getElementById('show-acl').checked ? 'block' : 'none';
+        document.getElementById('wrap-nyquist').style.display = document.getElementById('show-nyquist').checked ? 'block' : 'none';
+        document.getElementById('wrap-pz').style.display = document.getElementById('show-pz').checked ? 'block' : 'none';
+        document.getElementById('wrap-step').style.display = document.getElementById('show-step').checked ? 'block' : 'none';
+    }
+
+    function sortZP() {
+        zeros.sort((a, b) => a - b);
+        poles.sort((a, b) => a - b);
+    }
+
+    function addItem(type) { (type === 'zeros' ? zeros : poles).push(0); sortZP(); renderList(type); update(); }
+    function removeItem(type, idx) { (type === 'zeros' ? zeros : poles).splice(idx, 1); renderList(type); update(); }
+    function updateItem(type, idx, val) { (type === 'zeros' ? zeros : poles)[idx] = parsePrefix(val); sortZP(); renderList(type); update(); }
+
+    function renderList(type) {
+        const container = document.getElementById(type + '-list');
+        container.innerHTML = (type === 'zeros' ? zeros : poles).map((val, idx) => `
+            <div class="list-item">
+                <input type="text" value="${formatPrefix(val)}" onchange="updateItem('${type}', ${idx}, this.value)">
+                <button class="btn btn-icon" onclick="removeItem('${type}', ${idx})">✕</button>
+            </div>
+        `).join('');
+    }
+
+    let kNum = document.getElementById('k-num');
+    let kSlider = document.getElementById('k-slider');
+
+    kNum.onchange = function() {
+        let val = parsePrefix(this.value);
+        if (val <= 0 || isNaN(val)) {
+            val = k_gain;
+        }
+        k_gain = val;
+        kSlider.value = Math.log10(k_gain);
+        this.value = formatPrefix(k_gain);
+        update();
+    };
+
+    kSlider.oninput = function() {
+        k_gain = Math.pow(10, parseFloat(this.value));
+        kNum.value = formatPrefix(k_gain);
+        update();
+    };
+
+    let betaNum = document.getElementById('beta-num');
+    let betaSlider = document.getElementById('beta-slider');
+    
+    betaNum.onchange = function() {
+        let val = parseFloat(this.value);
+        if (isNaN(val)) val = 1.0;
+        if (val < 0) val = 0;
+        if (val > 1) val = 1;
+        beta = val;
+        this.value = beta.toFixed(2);
+        betaSlider.value = beta;
+        update();
+    };
+    
+    betaSlider.oninput = function() {
+        beta = parseFloat(this.value);
+        betaNum.value = beta.toFixed(2);
+        update();
+    };
+
+    let nyquistAuto = document.getElementById('nyquist-auto');
+    let nyquistVal = document.getElementById('nyquist-val');
+    let nyquistSlider = document.getElementById('nyquist-slider');
+    
+    nyquistAuto.onchange = function() {
+        nyquistVal.disabled = this.checked;
+        nyquistSlider.disabled = this.checked;
+        drawNyquist();
+    };
+    
+    nyquistVal.onchange = function() {
+        let v = parseFloat(this.value);
+        if (v < 0.1 || isNaN(v)) v = 0.1;
+        this.value = v.toFixed(1);
+        nyquistSlider.value = Math.log10(v);
+        drawNyquist();
+    };
+    
+    nyquistSlider.oninput = function() {
+        let v = Math.pow(10, parseFloat(this.value));
+        nyquistVal.value = v.toFixed(1);
+        drawNyquist();
+    };
+
+    function getInternalK() {
+        let mult = document.getElementById('unit-zp').value === 'hz' ? 2 * Math.PI : 1;
+        let k_int = k_gain;
+        zeros.forEach(z => { if (Math.abs(z) > 1e-5) k_int /= (-z * mult); });
+        poles.forEach(p => { if (Math.abs(p) > 1e-5) k_int *= (-p * mult); });
+        return k_int;
+    }
+
+    function getFreqRange() {
+        let mult = document.getElementById('unit-zp').value === 'hz' ? 2 * Math.PI : 1;
+        let p_mags = [...zeros, ...poles].map(v => Math.abs(v * mult)).filter(w => w > 1e-4);
+        let min_w = p_mags.length > 0 ? Math.floor(Math.log10(Math.min(...p_mags))) - 1 : -1;
+        let max_w = p_mags.length > 0 ? Math.ceil(Math.log10(Math.max(...p_mags))) + 1 : 3;
+        
+        if (max_w - min_w < 4) max_w = min_w + 4;
+        if (min_w > -1) min_w = -1;
+        if (max_w < 3) max_w = 3;
+        
+        return { min: min_w, max: max_w };
+    }
+
+    function getA(s) {
+        let mult = document.getElementById('unit-zp').value === 'hz' ? 2 * Math.PI : 1;
+        let k_int = getInternalK();
+        
+        let num = math.complex(k_int, 0);
+        zeros.forEach(z => num = math.multiply(num, math.subtract(s, math.complex(z * mult, 0))));
+        let den = math.complex(1, 0);
+        poles.forEach(p => den = math.multiply(den, math.subtract(s, math.complex(p * mult, 0))));
+        return math.abs(den) < 1e-10 ? math.complex(1e10, 0) : math.divide(num, den);
+    }
+
+    function update() { updateMath(); calculateMargins(); drawBode(); drawNyquist(); drawPZMap(); drawStepResponse(); }
+
+    function getChartColors() {
+        let isDark = document.body.getAttribute('data-theme') === 'dark';
+        return {
+            text: isDark ? '#94a3b8' : '#6b7280',
+            grid: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+            zeroLine: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'
+        };
+    }
+
+    function formatTerm(val) {
+        if (Math.abs(val) < 1e-5) return 's';
+        return val < 0 ? `(1 + s/${formatPrefix(Math.abs(val))})` : `(1 - s/${formatPrefix(val)})`;
+    }
+
+    function updateMath() {
+        let mult = document.getElementById('unit-zp').value === 'hz' ? 2 * Math.PI : 1;
+        let zText = zeros.length ? zeros.map(z => formatTerm(z * mult)).join(' * ') : "1";
+        let pText = poles.length ? poles.map(p => formatTerm(p * mult)).join(' * ') : "1";
+        let K_disp = formatPrefix(k_gain);
+        document.getElementById('math-display').innerHTML = `Aol(s) = ${K_disp} * ${zText} / ${pText}<br>` + 
+            `T(s) = ${beta} * Aol(s)<br>Acl(s) = Aol(s) / (1 + T(s))`;
+    }
+
+    function drawBode() {
+        let freq_mult = document.getElementById('unit-freq').value === 'hz' ? 1 / (2 * Math.PI) : 1;
+        let freq_label = document.getElementById('unit-freq').value === 'hz' ? 'Frequency [Hz]' : 'Pulsation [rad/s]';
+        let mag_is_db = document.getElementById('unit-mag').value === 'db';
+        let mag_label = mag_is_db ? 'Amplitude [dB]' : 'Amplitude [V/V]';
+        
+        let magData = [], phaseData = [], magAclData = [], prev_phase = 0;
+        let range = getFreqRange();
+        for (let i = range.min; i <= range.max; i += 0.05) {
+            let w = Math.pow(10, i);
+            let Aol = getA(math.complex(0, w));
+            let L = math.multiply(Aol, beta);
+            let mag = math.abs(L);
+            let phase = math.arg(L) * 180 / Math.PI;
+            if (magData.length > 0) { while(phase - prev_phase > 180) phase -= 360; while(phase - prev_phase < -180) phase += 360; }
+            prev_phase = phase;
+            
+            let x_val = w * freq_mult;
+            magData.push({x: x_val, y: mag_is_db ? 20 * Math.log10(mag) : Math.max(mag, 1e-10)}); 
+            phaseData.push({x: x_val, y: phase});
+            
+            let onePlusL = math.add(math.complex(1, 0), L);
+            let Acl = math.divide(Aol, onePlusL);
+            let magAcl = math.abs(Acl);
+            magAclData.push({x: x_val, y: mag_is_db ? 20 * Math.log10(magAcl) : Math.max(magAcl, 1e-10)});
+        }
+        
+        let gxMag = [], pxMag = [], gxPhase = [], pxPhase = [];
+        if (globalMargins.Wcg !== null) {
+            gxMag.push({x: globalMargins.Wcg * freq_mult, y: mag_is_db ? 0 : 1});
+            gxPhase.push({x: globalMargins.Wcg * freq_mult, y: globalMargins.PhaseAtWcg});
+        }
+        if (globalMargins.Wcp !== null) {
+            pxMag.push({x: globalMargins.Wcp * freq_mult, y: mag_is_db ? 20 * Math.log10(globalMargins.MagAtWcp) : globalMargins.MagAtWcp});
+            pxPhase.push({x: globalMargins.Wcp * freq_mult, y: -180});
+        }
+
+        let refMagData = [
+            {x: Math.pow(10, range.min), y: mag_is_db ? 0 : 1}, 
+            {x: Math.pow(10, range.max), y: mag_is_db ? 0 : 1}
+        ];
+        let refPhaseData = [
+            {x: Math.pow(10, range.min), y: -180}, 
+            {x: Math.pow(10, range.max), y: -180}
+        ];
+
+        renderBodeChart('bodeMagChart', 'Bode Plot - Amplitude T (loop gain)', 'Amplitude T', magData, gxMag, pxMag, refMagData, '0 dB (1 V/V)', freq_label, mag_label, mag_is_db ? 'linear' : 'logarithmic');
+        renderBodeChart('bodePhaseChart', 'Bode Plot - Phase T (loop gain)', 'Phase T', phaseData, gxPhase, pxPhase, refPhaseData, '-180°', freq_label, 'Phase [°]', 'linear');
+        renderAclChart('aclMagChart', 'Closed Loop Gain (Acl)', magAclData, freq_label, mag_label, mag_is_db ? 'linear' : 'logarithmic');
+    }
+
+    function drawNyquist() {
+        let points = [];
+        let range = getFreqRange();
+        for (let i = range.min; i <= range.max + 1; i += 0.01) {
+            let L = math.multiply(getA(math.complex(0, Math.pow(10, i))), beta);
+            points.push({x: L.re, y: L.im});
+        }
+        
+        let isAuto = document.getElementById('nyquist-auto').checked;
+        let max_val = 1.5;
+        
+        if (isAuto) {
+            points.forEach(p => {
+                if (Math.abs(p.x) < 1e6 && Math.abs(p.y) < 1e6) {
+                    if (Math.abs(p.x) > max_val) max_val = Math.abs(p.x);
+                    if (Math.abs(p.y) > max_val) max_val = Math.abs(p.y);
+                }
+            });
+            max_val = Math.ceil(max_val * 1.2);
+            let nVal = document.getElementById('nyquist-val');
+            let nSli = document.getElementById('nyquist-slider');
+            if (nVal && nSli) {
+                nVal.value = max_val.toFixed(1);
+                nSli.value = Math.log10(max_val);
+            }
+        } else {
+            max_val = parseFloat(document.getElementById('nyquist-val').value);
+        }
+
+        let colors = getChartColors();
+        if (charts['nyquistChart']) charts['nyquistChart'].destroy();
+        charts['nyquistChart'] = new Chart(document.getElementById('nyquistChart').getContext('2d'), { 
+            type: 'scatter', 
+            data: { datasets: [{ label: 'Nyquist T(jω)', data: points, showLine: true, borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0 }, { label: 'Critical Point (-1, j0)', data: [{x: -1, y: 0}], backgroundColor: '#ef4444', pointRadius: 5 }] }, 
+            options: { 
+                responsive: true, maintainAspectRatio: false,
+                animation: false,
+                scales: { 
+                    x: { 
+                        min: -max_val, max: max_val,
+                        title: { display: true, text: 'Re', color: colors.text }, 
+                        ticks: { color: colors.text },
+                        grid: { 
+                            color: (ctx) => ctx.tick.value === 0 ? colors.zeroLine : colors.grid, 
+                            lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 1 
+                        } 
+                    }, 
+                    y: { 
+                        min: -max_val, max: max_val,
+                        title: { display: true, text: 'Im', color: colors.text }, 
+                        ticks: { color: colors.text },
+                        grid: { 
+                            color: (ctx) => ctx.tick.value === 0 ? colors.zeroLine : colors.grid, 
+                            lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 1 
+                        } 
+                    } 
+                },
+                plugins: { 
+                    title: { display: true, text: 'Nyquist Plot', color: colors.text, font: {size: 14} },
+                    legend: { position: 'top', labels: { color: colors.text } } 
+                }
+            } 
+        });
+    }
+
+    function drawPZMap() {
+        let z_plot = zeros.map(z => ({ x: z, y: 0 }));
+        let p_plot = poles.map(p => ({ x: p, y: 0 }));
+        
+        let all_vals = [...zeros, ...poles, 0];
+        let max_abs = Math.max(...all_vals.map(Math.abs));
+        if (max_abs < 1) max_abs = 1;
+        let limit = max_abs * 1.1;
+
+        let colors = getChartColors();
+        let unitLabel = document.getElementById('unit-zp').value === 'hz' ? '[Hz]' : '[rad/s]';
+
+        if (charts['pzChart']) charts['pzChart'].destroy();
+        charts['pzChart'] = new Chart(document.getElementById('pzChart').getContext('2d'), {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    { label: 'Poles (x)', data: p_plot, backgroundColor: '#ef4444', pointStyle: 'crossRot', pointRadius: 8, pointHoverRadius: 10, borderWidth: 2, borderColor: '#ef4444' },
+                    { label: 'Zeros (o)', data: z_plot, backgroundColor: 'transparent', pointStyle: 'circle', pointRadius: 6, pointHoverRadius: 8, borderWidth: 2, borderColor: '#3b82f6' }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, animation: false,
+                scales: {
+                    x: { min: -limit, max: limit, title: { display: true, text: 'Real (σ) ' + unitLabel, color: colors.text }, ticks: { color: colors.text }, grid: { color: (ctx) => ctx.tick.value === 0 ? colors.zeroLine : colors.grid, lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 1 } },
+                    y: { min: -limit, max: limit, title: { display: true, text: 'Imag (jω) ' + unitLabel, color: colors.text }, ticks: { color: colors.text }, grid: { color: (ctx) => ctx.tick.value === 0 ? colors.zeroLine : colors.grid, lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 1 } }
+                },
+                plugins: {
+                    title: { display: true, text: 'Pole and Zeros Map (s-plane)', color: colors.text, font: {size: 14} },
+                    legend: { position: 'top', labels: { color: colors.text } }
+                }
+            }
+        });
+    }
+
+    function polyMul(p1, p2) { let r = new Array(p1.length + p2.length - 1).fill(0); for(let i=0; i<p1.length; i++) for(let j=0; j<p2.length; j++) r[i+j] += p1[i]*p2[j]; return r; }
+    function polyAdd(p1, p2) { let l = Math.max(p1.length, p2.length), r = new Array(l).fill(0); for(let i=0; i<p1.length; i++) r[i+l-p1.length] += p1[i]; for(let i=0; i<p2.length; i++) r[i+l-p2.length] += p2[i]; return r; }
+    function getPoly(roots) { return roots.reduce((acc, r) => polyMul(acc, [1, -r]), [1]); }
+
+    function calculateMargins() {
+        globalMargins = { Wcg: null, Wcp: null, PM: Infinity, GM: Infinity, MagAtWcp: null, PhaseAtWcg: null };
+        let w_arr = [], mag_arr = [], phase_arr = [], prev_phase = 0;
+        let range = getFreqRange();
+        for (let i = range.min - 1; i <= range.max + 1; i += 0.01) {
+            let w = Math.pow(10, i), L = math.multiply(getA(math.complex(0, w)), beta);
+            let phase = math.arg(L) * 180 / Math.PI;
+            if (w_arr.length > 0) { while(phase - prev_phase > 180) phase -= 360; while(phase - prev_phase < -180) phase += 360; }
+            prev_phase = phase; w_arr.push(w); mag_arr.push(math.abs(L)); phase_arr.push(phase);
+        }
+        for (let i = 0; i < w_arr.length - 1; i++) {
+            if ((mag_arr[i] > 1 && mag_arr[i+1] <= 1) || (mag_arr[i] < 1 && mag_arr[i+1] >= 1)) { 
+                let t = (1 - mag_arr[i]) / (mag_arr[i+1] - mag_arr[i]); 
+                globalMargins.Wcg = w_arr[i] + t*(w_arr[i+1]-w_arr[i]); 
+                globalMargins.PhaseAtWcg = phase_arr[i] + t*(phase_arr[i+1]-phase_arr[i]);
+                globalMargins.PM = globalMargins.PhaseAtWcg + 180;
+                while (globalMargins.PM > 180) globalMargins.PM -= 360;
+                while (globalMargins.PM < -180) globalMargins.PM += 360;
+            }
+            
+            let cross180 = false;
+            let targetPhase = -180;
+            if ((phase_arr[i] > -180 && phase_arr[i+1] <= -180) || (phase_arr[i] < -180 && phase_arr[i+1] >= -180)) { cross180 = true; targetPhase = -180; }
+            else if ((phase_arr[i] > -540 && phase_arr[i+1] <= -540) || (phase_arr[i] < -540 && phase_arr[i+1] >= -540)) { cross180 = true; targetPhase = -540; }
+            
+            if (cross180) {
+                let t = (targetPhase - phase_arr[i]) / (phase_arr[i+1] - phase_arr[i]); 
+                globalMargins.Wcp = w_arr[i] + t*(w_arr[i+1]-w_arr[i]); 
+                globalMargins.MagAtWcp = mag_arr[i] + t*(mag_arr[i+1]-mag_arr[i]); 
+                if(globalMargins.MagAtWcp > 0) globalMargins.GM = -20 * Math.log10(globalMargins.MagAtWcp); 
+            }
+        }
+
+        let freq_mult = document.getElementById('unit-freq').value === 'hz' ? 1 / (2 * Math.PI) : 1;
+        let freq_label = document.getElementById('unit-freq').value === 'hz' ? ' Hz' : ' rad/s';
+        let mag_is_db = document.getElementById('unit-mag').value === 'db';
+        let mag_label = mag_is_db ? ' dB' : ' V/V';
+        let gm_val = globalMargins.GM !== Infinity ? (mag_is_db ? globalMargins.GM : (1 / globalMargins.MagAtWcp)) : Infinity;
+
+        document.getElementById('pm').innerText = globalMargins.PM !== Infinity ? globalMargins.PM.toFixed(2) + '°' : "∞"; 
+        document.getElementById('gx').innerText = globalMargins.Wcg ? formatPrefix(globalMargins.Wcg * freq_mult) + freq_label : "--"; 
+        document.getElementById('gm').innerText = globalMargins.GM !== Infinity ? gm_val.toFixed(2) + mag_label : "∞"; 
+        document.getElementById('px').innerText = globalMargins.Wcp ? formatPrefix(globalMargins.Wcp * freq_mult) + freq_label : "--";
+    }
+
+    function isStableRouthHurwitz(poly) {
+        let n = poly.length - 1;
+        if (n < 0) return true;
+        let sign = Math.sign(poly[0]);
+        if (sign === 0) return false;
+        for (let i = 0; i <= n; i++) {
+            if (Math.sign(poly[i]) !== sign && Math.abs(poly[i]) > 1e-9) return false;
+        }
+        if (n <= 2) return true;
+        
+        let routh = [];
+        routh[0] = []; routh[1] = [];
+        for (let i = 0; i <= n; i++) {
+            if (i % 2 === 0) routh[0].push(poly[i]);
+            else routh[1].push(poly[i]);
+        }
+        if (routh[1].length < routh[0].length) routh[1].push(0);
+        
+        for (let i = 2; i <= n; i++) {
+            routh[i] = [];
+            for (let j = 0; j < routh[i-1].length - 1; j++) {
+                let num = routh[i-1][0] * routh[i-2][j+1] - routh[i-2][0] * routh[i-1][j+1];
+                let den = routh[i-1][0];
+                if (Math.abs(den) < 1e-12) den = 1e-12;
+                routh[i].push(num / den);
+            }
+            routh[i].push(0);
+            if (Math.sign(routh[i][0]) !== sign && Math.abs(routh[i][0]) > 1e-9) return false;
+        }
+        return true;
+    }
+
+    function drawStepResponse() {
+        let mult = document.getElementById('unit-zp').value === 'hz' ? 2 * Math.PI : 1;
+        let k_int = getInternalK();
+        
+        let num = getPoly(zeros.map(z => z * mult)).map(x => x * k_int);
+        let den = getPoly(poles.map(p => p * mult));
+        let denCL = polyAdd(den, num.map(x => x * beta));
+        let numCL = num; 
+        
+        let isStable = isStableRouthHurwitz(denCL);
+        
+        let a0 = denCL[0] || 1;
+        let a = denCL.map(x => x / a0);
+        let b = new Array(a.length).fill(0);
+        let offset = a.length - numCL.length;
+        for(let i=0; i<numCL.length; i++) b[offset + i] = numCL[i] / a0;
+        
+        let n = a.length - 1;
+        
+        let max_freq = 1;
+        let p_mags = poles.map(p => Math.abs(p * mult)).filter(w => w > 1e-4);
+        if (p_mags.length > 0) max_freq = Math.max(...p_mags);
+        if (globalMargins.Wcg) max_freq = Math.max(max_freq, globalMargins.Wcg);
+        
+        let ringing_freq = globalMargins.Wcg ? globalMargins.Wcg : max_freq;
+        let dt = Math.min(0.001, 0.1 / max_freq, 0.05 / ringing_freq);
+        if (dt < 1e-7) dt = 1e-7;
+        
+        let min_p = p_mags.length > 0 ? Math.min(...p_mags) : 1;
+        let t_max = Math.max(0.01, 7 / min_p);
+        if (t_max > 100) t_max = 100;
+        if (!isStable) t_max = Math.min(t_max, 2 / min_p);
+        
+        let steps = Math.ceil(t_max / dt);
+        if (steps > 200000) { 
+            t_max = 200000 * dt; 
+            steps = 200000; 
+        }
+        
+        let time = [], response = [], x = new Array(n).fill(0);
+        let save_interval = Math.max(1, Math.ceil(steps / 2000));
+        let steady_count = 0;
+        let steady_threshold = Math.max(200, Math.ceil(steps * 0.02));
+        let prev_y = 0;
+        
+        function get_dx(curr_x, u) {
+            let dx = new Array(n).fill(0);
+            for (let i = 0; i < n-1; i++) dx[i] = curr_x[i+1];
+            let dxl = u;
+            for (let i = 0; i < n; i++) dxl -= a[n-i] * curr_x[i];
+            dx[n-1] = dxl;
+            return dx;
+        }
+        
+        for (let step = 0; step <= steps; step++) {
+            let t = step * dt;
+            let u = 1.0; 
+            
+            let y = 0;
+            if (n > 0) {
+                y = b[0] * u; 
+                for (let i = 0; i < n; i++) y += (b[n-i] - b[0]*a[n-i]) * x[i];
+            } else {
+                y = b[0] * u;
+            }
+            
+            if (step % save_interval === 0) { 
+                time.push(Number(t.toPrecision(4))); 
+                response.push(y); 
+            }
+            
+            if (Math.abs(y) > 1e6 || isNaN(y)) break;
+            
+            if (n > 0) {
+                let k1 = get_dx(x, u);
+                let x_k1 = x.map((xi, i) => xi + k1[i] * dt / 2);
+                let k2 = get_dx(x_k1, u);
+                let x_k2 = x.map((xi, i) => xi + k2[i] * dt / 2);
+                let k3 = get_dx(x_k2, u);
+                let x_k3 = x.map((xi, i) => xi + k3[i] * dt);
+                let k4 = get_dx(x_k3, u);
+                
+                for(let i=0; i<n; i++) x[i] += (dt/6) * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i]);
+                
+                if (isStable && step > steps * 0.05) {
+                    let dy_dt = Math.abs(y - prev_y) / dt;
+                    if (dy_dt < 1e-3 * Math.max(1, Math.abs(y))) steady_count++;
+                    else steady_count = 0;
+                    if (steady_count > steady_threshold) break;
+                }
+                prev_y = y;
+            }
+        }
+
+        let st = document.getElementById('stability-status');
+        st.innerText = isStable ? "AMPLIFIER STABLE" : "AMPLIFIER UNSTABLE"; st.className = "status " + (isStable ? "stable" : "unstable");
+        renderStepChart('stepChart', 'Impulse Response Y(t)', time, response, 'Time [s]', 'Amplitude');
+    }
+
+    function renderBodeChart(id, chartTitle, legendLabel, lineData, gxData, pxData, refData, refLabel, xTitle, yTitle, yType) {
+        let colors = getChartColors();
+        if (charts[id]) charts[id].destroy();
+        charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+            data: {
+                datasets: [
+                    { type: 'line', label: legendLabel, data: lineData, borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, fill: false },
+                    { type: 'line', label: refLabel, data: refData, borderColor: colors.text, borderWidth: 1, borderDash: [5, 5], pointRadius: 0, fill: false },
+                    { type: 'scatter', label: 'GX (Gain crossover)', data: gxData, backgroundColor: '#10b981', pointRadius: 6, pointStyle: 'circle' },
+                    { type: 'scatter', label: 'PX (Phase crossover)', data: pxData, backgroundColor: '#ef4444', pointRadius: 6, pointStyle: 'triangle' }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: { type: 'logarithmic', title: { display: true, text: xTitle, color: colors.text }, ticks: { color: colors.text }, grid: { color: colors.grid } },
+                    y: { type: yType, title: { display: true, text: yTitle, color: colors.text }, ticks: { color: colors.text }, grid: { color: colors.grid } }
+                },
+                plugins: { 
+                    title: { display: true, text: chartTitle, color: colors.text, font: {size: 14} },
+                    legend: { position: 'top', labels: { color: colors.text } } 
+                }
+            }
+        });
+    }
+
+    function renderStepChart(id, label, labels, data, xTitle, yTitle) {
+        let colors = getChartColors();
+        if (charts[id]) charts[id].destroy();
+        charts[id] = new Chart(document.getElementById(id).getContext('2d'), { 
+            type: 'line', 
+            data: { labels: labels, datasets: [{ label: label, data: data, borderColor: '#10b981', backgroundColor: '#10b98120', fill: true, pointRadius: 0, borderWidth: 2 }] }, 
+            options: { 
+                responsive: true, maintainAspectRatio: false, animation: false,
+                scales: { 
+                    x: { title: { display: true, text: xTitle, color: colors.text }, ticks: { maxTicksLimit: 10, color: colors.text }, grid: { color: colors.grid } }, 
+                    y: { title: { display: true, text: yTitle, color: colors.text }, ticks: { color: colors.text }, grid: { color: colors.grid } } 
+                }, 
+                plugins: { 
+                    title: { display: true, text: 'Impulse response of an amplifier', color: colors.text, font: {size: 14} },
+                    legend: { position: 'top', labels: { color: colors.text } } 
+                }
+            } 
+        });
+    }
+
+    function renderAclChart(id, title, lineData, xTitle, yTitle, yType) {
+        let colors = getChartColors();
+        if (charts[id]) charts[id].destroy();
+        charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+            data: {
+                datasets: [
+                    { type: 'line', label: 'Amplitude (Acl)', data: lineData, borderColor: '#8b5cf6', borderWidth: 2, pointRadius: 0, fill: false }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: { type: 'logarithmic', title: { display: true, text: xTitle, color: colors.text }, ticks: { color: colors.text }, grid: { color: colors.grid } },
+                    y: { type: yType, title: { display: true, text: yTitle, color: colors.text }, ticks: { color: colors.text }, grid: { color: colors.grid } }
+                },
+                plugins: { 
+                    title: { display: true, text: title, color: colors.text, font: {size: 14} },
+                    legend: { position: 'top', labels: { color: colors.text } } 
+                }
+            }
+        });
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
