@@ -233,11 +233,11 @@
         }
     </style>
 </head>
-<body data-theme="light">
+<body data-theme="dark">
 
 <div class="header">
     <h1>Stability Simulator of Closed Loop Amplifier</h1>
-    <button id="theme-toggle" class="btn" style="position: absolute; right: 20px; top: 20px;" onclick="toggleTheme()">🌙 Tryb Ciemny</button>
+    <button id="theme-toggle" class="btn" style="position: absolute; right: 20px; top: 20px;" onclick="toggleTheme()">☀️ Light Mode</button>
 </div>
 
 <div class="layout">
@@ -245,9 +245,9 @@
         <div class="panel">
             <h2>Schematic (Closed Loop)</h2>
             <div class="schematic">
-U(s) ───►(+)───[ Aol(s) ]───┬───► Y(s)
- ▲                │
- └───[  Beta  ]◄──┘
+U(s) ──►(+)──[ Aol(s) ]──┬──► Y(s)
+ ▲               │
+ └──[  Beta  ]◄──┘
             </div>
         </div>
 
@@ -365,9 +365,9 @@ U(s) ───►(+)───[ Aol(s) ]───┬───► Y(s)
         <div class="charts-grid">
             <div class="chart-wrapper" id="wrap-bode-mag"><canvas id="bodeMagChart"></canvas></div>
             <div class="chart-wrapper" id="wrap-bode-phase"><canvas id="bodePhaseChart"></canvas></div>
+            <div class="chart-wrapper" id="wrap-nyquist"><canvas id="nyquistChart"></canvas></div>
+            <div class="chart-wrapper" id="wrap-pz"><canvas id="pzChart"></canvas></div>
             <div class="chart-wrapper" id="wrap-acl"><canvas id="aclMagChart"></canvas></div>
-            <div class="chart-wrapper square" id="wrap-nyquist"><canvas id="nyquistChart"></canvas></div>
-            <div class="chart-wrapper square" id="wrap-pz"><canvas id="pzChart"></canvas></div>
             <div class="chart-wrapper" id="wrap-step"><canvas id="stepChart"></canvas></div>
         </div>
     </div>
